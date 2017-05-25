@@ -50,6 +50,7 @@ add_message_files(
   Envelope.msg
   Rumble.msg
   Periodic.msg
+  Constant.msg
 )
 
 ## Generate services in the 'srv' folder

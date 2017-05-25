@@ -1,0 +1,9 @@
+uint8 DOWN=0
+uint8 LEFT=1
+uint8 UP=2
+uint8 RIGHT=3
+int16 level
+uint16 length
+uint16 delay
+uint8 direction
+Envelope envelope

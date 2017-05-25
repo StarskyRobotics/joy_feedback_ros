@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <linux/input.h>
 #include <ros/ros.h>
+#include <std_msgs/Int8.h>
 #include <std_msgs/Float32.h>
 #include <std_msgs/UInt16.h>
 #include <string>
@@ -15,6 +16,7 @@
 #include "joy_feedback_ros/Envelope.h"
 #include "joy_feedback_ros/Rumble.h"
 #include "joy_feedback_ros/Periodic.h"
+#include "joy_feedback_ros/Constant.h"
 
 class JoyFeedback
 {
@@ -22,6 +24,9 @@ public:
   JoyFeedback();
 
 private:
+void constantCallback(const joy_feedback_ros::Constant::ConstPtr& msg);
+void gainCallback(const std_msgs::Int8::ConstPtr& msg);
+void autocenterCallback(const std_msgs::Int8::ConstPtr& msg);
   void rumbleCallback(const joy_feedback_ros::Rumble::ConstPtr& msg);
   void periodicCallback(const joy_feedback_ros::Periodic::ConstPtr& msg);
   void playCallback(const std_msgs::UInt16::ConstPtr& msg);
@@ -31,6 +36,9 @@ private:
   ros::Subscriber rumble_sub_;
   ros::Subscriber periodic_sub_;
   ros::Subscriber play_sub_;
+  ros::Subscriber constant_sub_;
+  ros::Subscriber gain_sub_;
+  ros::Subscriber autocenter_sub_;
 
   std::string device_;
   int fd_;
@@ -42,7 +50,6 @@ private:
 void JoyFeedback::playCallback(const std_msgs::UInt16::ConstPtr& msg)
 {
   const int ind = msg->data;
-  ROS_INFO_STREAM("play " << ind);
   if (ind >= effects_.size())
   {
     ROS_WARN_STREAM("play index is too big " << ind << " " << effects_.size()
@@ -52,6 +59,7 @@ void JoyFeedback::playCallback(const std_msgs::UInt16::ConstPtr& msg)
   struct input_event play;
   play.type = EV_FF;
   play.code = effects_[ind].id;
+  ROS_INFO_STREAM("play index:" << ind << " id:" << play.code);
   // has this effect been uploaded yet?
   if (play.code < 0) return;
   // set this to zero to stop the effect
@@ -77,6 +85,66 @@ void JoyFeedback::rumbleCallback(const joy_feedback_ros::Rumble::ConstPtr& msg)
   // effects_[ind].direction = 0x4000;  // TBD does anything for rumble?
   effects_[ind].replay.length = 4000;  // 4 seconds
   effects_[ind].replay.delay = 100;
+
+  if (ioctl(fd_, EVIOCSFF, &effects_[ind]) < 0)
+  {
+    ROS_WARN_STREAM("ioctl upload effect " << ind << " " << strerror(errno));
+  }
+}
+
+void JoyFeedback::autocenterCallback(const std_msgs::Int8::ConstPtr& msg)
+{
+  if (!initted_) return;
+
+  ROS_INFO_STREAM("autocenter set " << int(msg->data));
+
+  int autocenter = msg->data;
+  struct input_event ie;
+  ie.type = EV_FF;
+  ie.code = FF_AUTOCENTER;
+  ie.value = 0xFFFFUL * autocenter / 100;
+
+  if(write(fd_, &ie, sizeof(ie)) < 0) {
+    ROS_WARN_STREAM("error setting autocenter " << strerror(errno));
+  }
+}
+
+void JoyFeedback::gainCallback(const std_msgs::Int8::ConstPtr& msg)
+{
+  if (!initted_) return;
+
+  ROS_INFO_STREAM("gain set " << int(msg->data));
+  int gain = msg->data; /* 0 to 100 */
+  struct input_event ie;    /* structure used to communicate with the driver */
+
+  ie.type = EV_FF;
+  ie.code = FF_GAIN;
+  ie.value = 0xFFFFUL * gain / 100;
+
+  if (write(fd_, &ie, sizeof(ie)) < 0)
+    ROS_WARN_STREAM("error setting gain " << strerror(errno));
+}
+
+void JoyFeedback::constantCallback(const joy_feedback_ros::Constant::ConstPtr& msg)
+{
+  if (!initted_) return;
+
+  ROS_INFO_STREAM("constant set " << msg->level);
+
+  const int ind = 0;
+  effects_[ind].type = FF_CONSTANT;
+  effects_[ind].id = -1;
+
+  effects_[ind].u.constant.level = msg->level;
+  effects_[ind].u.constant.envelope.attack_length = msg->envelope.attack_length; //duration of attack (ms)
+  effects_[ind].u.constant.envelope.attack_level = msg->envelope.attack_level; //level at begginning of attack 0 - 0x7fff
+  effects_[ind].u.constant.envelope.fade_length = msg->envelope.fade_length; //duration of fade (ms)
+  effects_[ind].u.constant.envelope.fade_level = msg->envelope.fade_level; //level at end of fade
+  effects_[ind].trigger.button = 0x0; // button that triggers
+  effects_[ind].trigger.interval = 0; // how soon can be re-triggered
+  effects_[ind].direction = 0x4000 * msg->direction; // 0=down, 0x4000=left, 0x8000=up, 0xc000=right
+  effects_[ind].replay.length = msg->length; // duration of effect
+  effects_[ind].replay.delay = msg->delay; // delay before starts playing
 
   if (ioctl(fd_, EVIOCSFF, &effects_[ind]) < 0)
   {
@@ -132,6 +200,9 @@ JoyFeedback::JoyFeedback() :
   rumble_sub_ = nh_.subscribe<joy_feedback_ros::Rumble>("rumble", 1, &JoyFeedback::rumbleCallback, this);
   periodic_sub_ = nh_.subscribe<joy_feedback_ros::Periodic>("periodic", 1, &JoyFeedback::periodicCallback, this);
   play_sub_ = nh_.subscribe("play", 1, &JoyFeedback::playCallback, this);
+  constant_sub_ = nh_.subscribe("constant",1,&JoyFeedback::constantCallback, this);
+  gain_sub_ = nh_.subscribe("gain",1,&JoyFeedback::gainCallback, this);
+  autocenter_sub_ = nh_.subscribe("autocenter",1,&JoyFeedback::autocenterCallback, this);
   initted_ = init();
 }
 
