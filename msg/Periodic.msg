@@ -8,5 +8,6 @@ uint16 period
 int16 magnitude
 int16 offset
 uint16 phase
+int16 id
 
 Envelope envelope

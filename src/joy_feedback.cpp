@@ -77,9 +77,9 @@ void JoyFeedback::rumbleCallback(const joy_feedback_ros::Rumble::ConstPtr& msg)
 
   ROS_INFO_STREAM("rumble set " << msg->strong_magnitude << " " << msg->weak_magnitude);
 
-  const int ind = 0;
+  const int ind = msg->id;
   effects_[ind].type = FF_RUMBLE;
-  effects_[ind].id = -1;
+  effects_[ind].id = ind;
   effects_[ind].u.rumble.strong_magnitude = msg->strong_magnitude;
   effects_[ind].u.rumble.weak_magnitude   = msg->weak_magnitude;
   // effects_[ind].direction = 0x4000;  // TBD does anything for rumble?
@@ -131,9 +131,9 @@ void JoyFeedback::constantCallback(const joy_feedback_ros::Constant::ConstPtr& m
 
   ROS_INFO_STREAM("constant set " << msg->level);
 
-  const int ind = 0;
+  const int ind = msg->id;
   effects_[ind].type = FF_CONSTANT;
-  effects_[ind].id = -1;
+  effects_[ind].id = ind;
 
   effects_[ind].u.constant.level = msg->level;
   effects_[ind].u.constant.envelope.attack_length = msg->envelope.attack_length; //duration of attack (ms)
@@ -159,9 +159,9 @@ void JoyFeedback::periodicCallback(const joy_feedback_ros::Periodic::ConstPtr& m
   ROS_INFO_STREAM("periodic set " << int(msg->waveform) << " " << msg->period
                   << " " << msg->magnitude);
 
-  const int ind = 0;
+  const int ind = msg->id;
   effects_[ind].type = FF_PERIODIC;
-  effects_[ind].id = -1;
+  effects_[ind].id = ind;
 
   if (msg->waveform == joy_feedback_ros::Periodic::WAVEFORM_FF_SQUARE)
     effects_[ind].u.periodic.waveform = FF_SQUARE;

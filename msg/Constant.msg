@@ -6,4 +6,5 @@ int16 level
 uint16 length
 uint16 delay
 uint8 direction
+int16 id
 Envelope envelope
